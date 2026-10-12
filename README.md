@@ -38,6 +38,8 @@ Copy-Item .env.example .env   # set OIDC_CLIENT_SECRET, OIDC_WORKER_CLIENT_SECRE
 docker compose up --build     # first run builds api/worker from GitHub (~3-5 min)
 ```
 
+> If the build fails with `failed to evaluate path "https://github.com/..."`, your Docker Desktop compose bake path is mishandling git-URL contexts — rerun as `COMPOSE_BAKE=false docker compose up --build` (plain `docker build` with the same git URL also works).
+
 Then open **http://localhost:8081**:
 
 1. **Parties** → create a Supplier and a Customer.
