@@ -1,0 +1,11 @@
+**/.git
+**/bin
+**/obj
+**/TestResults
+**/coverage*.json
+.env
+docs
+README.md
+LICENSE
+tests
+docker-compose.yml
