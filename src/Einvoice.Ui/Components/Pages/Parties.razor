@@ -1,0 +1,98 @@
+@page "/parties"
+@inject IEinvoiceApiClient Api
+
+<PageTitle>Parties</PageTitle>
+
+<h1 class="mb-3">Parties</h1>
+
+<div class="row">
+    <div class="col-md-7">
+        @if (_parties is null)
+        {
+            <p><em>Loading…</em></p>
+        }
+        else
+        {
+            <table class="table table-striped">
+                <thead><tr><th>Name</th><th>Country</th><th>VAT</th><th>Type</th></tr></thead>
+                <tbody>
+                @foreach (var party in _parties)
+                {
+                    <tr>
+                        <td>@party.Name</td>
+                        <td>@party.Country</td>
+                        <td>@(party.VatNumber ?? "—")</td>
+                        <td>@party.Type</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header">New party</div>
+            <div class="card-body">
+                <form @onsubmit="CreateAsync" @onsubmit:preventDefault>
+                    <div class="mb-2">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" @bind="_name" required />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Country (ISO 3166-1 alpha-2)</label>
+                        <input type="text" class="form-control" @bind="_country" maxlength="2" required />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">VAT number (optional)</label>
+                        <input type="text" class="form-control" @bind="_vatNumber" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type</label>
+                        <select class="form-select" @bind="_type">
+                            <option value="Supplier">Supplier</option>
+                            <option value="Customer">Customer</option>
+                        </select>
+                    </div>
+                    @if (_error is not null)
+                    {
+                        <div class="alert alert-danger">@_error</div>
+                    }
+                    <button class="btn btn-primary" type="submit" disabled="@_busy">Create</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<PartyResponse>? _parties;
+    private string _name = string.Empty;
+    private string _country = "PT";
+    private string? _vatNumber;
+    private string _type = "Supplier";
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => _parties = await Api.GetPartiesAsync();
+
+    private async Task CreateAsync()
+    {
+        _error = null;
+        _busy = true;
+        try
+        {
+            await Api.CreatePartyAsync(new CreatePartyRequest(_name, _country, _vatNumber, _type));
+            _parties = await Api.GetPartiesAsync();
+            _name = string.Empty;
+            _vatNumber = null;
+        }
+        catch (HubApiException ex)
+        {
+            _error = ex.Detail;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

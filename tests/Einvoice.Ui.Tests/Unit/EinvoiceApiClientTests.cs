@@ -49,7 +49,7 @@ public sealed class EinvoiceApiClientTests : IDisposable
         var single = Assert.Single(invoices);
         Assert.Equal("INV-1", single.Number);
         var get = _server.LogEntries.First(e => e.RequestMessage!.Path == "/v1/invoices");
-        Assert.Equal("Bearer", get.RequestMessage!.Headers["Authorization"][0].Split(' ')[0]);
+        Assert.Equal("Bearer", get.RequestMessage!.Headers!["Authorization"]![0].Split(' ')[0]);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class EinvoiceApiClientTests : IDisposable
         Assert.Equal("INV-9", created.Number);
         var post = _server.LogEntries.First(e =>
             e.RequestMessage!.Method == "POST" && e.RequestMessage.Path == "/v1/invoices");
-        Assert.True(post.RequestMessage.Headers.ContainsKey("Idempotency-Key"));
+        Assert.True(post.RequestMessage!.Headers!.ContainsKey("Idempotency-Key"));
     }
 
     [Fact]
@@ -111,5 +111,58 @@ public sealed class EinvoiceApiClientTests : IDisposable
 
         var party = Assert.Single(parties);
         Assert.Equal("Acme Lda", party.Name);
+    }
+
+    [Fact]
+    public async Task GetInvoice_found_deserializes_single()
+    {
+        StubToken();
+        var id = Guid.Parse("3fa85f64-5717-4562-b3fc-2c963f66afa6");
+        _server.Given(Request.Create().WithPath($"/v1/invoices/{id}").UsingGet())
+            .RespondWith(Response.Create().WithStatusCode(200)
+                .WithHeader("Content-Type", "application/json")
+                .WithBody("""
+                    {"id":"3fa85f64-5717-4562-b3fc-2c963f66afa6","number":"INV-7","issueDate":"2026-10-12",
+                     "dueDate":"2026-11-12","currency":"EUR","status":"Completed",
+                     "sellerId":"11111111-1111-1111-1111-111111111111","buyerId":"22222222-2222-2222-2222-222222222222",
+                     "lines":[],"totalAmount":1}
+                    """));
+
+        var invoice = await _client.GetInvoiceAsync(id);
+
+        Assert.NotNull(invoice);
+        Assert.Equal("INV-7", invoice!.Number);
+    }
+
+    [Fact]
+    public async Task GetInvoice_missing_returns_null()
+    {
+        StubToken();
+        var id = Guid.NewGuid();
+        _server.Given(Request.Create().WithPath($"/v1/invoices/{id}").UsingGet())
+            .RespondWith(Response.Create().WithStatusCode(404)
+                .WithBodyAsJson(new { title = "Not found", status = 404 }));
+
+        Assert.Null(await _client.GetInvoiceAsync(id));
+    }
+
+    [Fact]
+    public async Task CreateParty_posts_and_parses_201()
+    {
+        StubToken();
+        _server.Given(Request.Create().WithPath("/v1/parties").UsingPost())
+            .RespondWith(Response.Create().WithStatusCode(201)
+                .WithHeader("Content-Type", "application/json")
+                .WithBody("""
+                    {"id":"99999999-9999-9999-9999-999999999999","name":"New Co","country":"PT",
+                     "vatNumber":null,"type":"Customer"}
+                    """));
+
+        var party = await _client.CreatePartyAsync(new CreatePartyRequest("New Co", "PT", null, "Customer"));
+
+        Assert.Equal("New Co", party.Name);
+        var post = _server.LogEntries.First(e =>
+            e.RequestMessage!.Method == "POST" && e.RequestMessage.Path == "/v1/parties");
+        Assert.NotNull(post.RequestMessage);
     }
 }

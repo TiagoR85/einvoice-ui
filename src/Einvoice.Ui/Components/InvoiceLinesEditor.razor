@@ -1,0 +1,46 @@
+<div class="border rounded p-3 mb-3">
+    <div class="d-flex justify-content-between">
+        <h5>Lines</h5>
+        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddLine">Add line</button>
+    </div>
+    @for (var i = 0; i < Lines.Count; i++)
+    {
+        var index = i;
+        <div class="row g-2 mt-1 align-items-end" data-testid="line-row">
+            <div class="col">
+                <label class="form-label">Description</label>
+                <input type="text" class="form-control" value="@Lines[index].Description"
+                       @onchange="e => Lines[index] = Lines[index] with { Description = e.Value?.ToString() ?? string.Empty }" />
+            </div>
+            <div class="col-2">
+                <label class="form-label">Qty</label>
+                <input class="form-control" type="number" step="any" value="@Lines[index].Quantity"
+                       @onchange="e => Lines[index] = Lines[index] with { Quantity = Parse(e.Value) }" />
+            </div>
+            <div class="col-2">
+                <label class="form-label">Unit price</label>
+                <input class="form-control" type="number" step="any" value="@Lines[index].UnitPrice"
+                       @onchange="e => Lines[index] = Lines[index] with { UnitPrice = Parse(e.Value) }" />
+            </div>
+            <div class="col-2">
+                <label class="form-label">VAT %</label>
+                <input class="form-control" type="number" step="any" value="@(Lines[index].VatRate * 100)"
+                       @onchange="e => Lines[index] = Lines[index] with { VatRate = Parse(e.Value) / 100m }" />
+            </div>
+            <div class="col-1">
+                <button type="button" class="btn btn-outline-danger" @onclick="() => RemoveLine(index)">×</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<CreateInvoiceLineRequest> Lines { get; set; } = new();
+
+    private void AddLine() => Lines.Add(new CreateInvoiceLineRequest("", 1, 0, 0.23m));
+
+    private void RemoveLine(int index) => Lines.RemoveAt(index);
+
+    private static decimal Parse(object? value) =>
+        decimal.TryParse(value?.ToString(), out var result) ? result : 0m;
+}

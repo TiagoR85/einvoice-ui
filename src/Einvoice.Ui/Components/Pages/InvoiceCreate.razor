@@ -1,0 +1,128 @@
+@page "/invoices/new"
+@inject IEinvoiceApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>New invoice</PageTitle>
+
+<h1 class="mb-3">New invoice</h1>
+
+@if (_parties is null)
+{
+    <p><em>Loading parties…</em></p>
+}
+else if (_parties.Count < 2)
+{
+    <div class="alert alert-warning">
+        At least two parties are required. Create them on the <a href="/parties">Parties</a> page first.
+    </div>
+}
+else
+{
+    <form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Number</label>
+                <input type="text" class="form-control" @bind="_number" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Issue date</label>
+                <input class="form-control" type="date" @bind="_issueDate" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Due date</label>
+                <input class="form-control" type="date" @bind="_dueDate" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Currency</label>
+                <input type="text" class="form-control" @bind="_currency" maxlength="3" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Seller</label>
+                <select class="form-select" @bind="_sellerId">
+                    @foreach (var party in _parties)
+                    {
+                        <option value="@party.Id">@party.Name (@party.Type)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Buyer</label>
+                <select class="form-select" @bind="_buyerId">
+                    @foreach (var party in _parties)
+                    {
+                        <option value="@party.Id">@party.Name (@party.Type)</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <InvoiceLinesEditor Lines="_lines" />
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <button class="btn btn-primary" type="submit" disabled="@_busy">
+            @(_busy ? "Creating…" : "Create invoice")
+        </button>
+        <a class="btn btn-link" href="/">Cancel</a>
+    </form>
+}
+
+@code {
+    private List<PartyResponse>? _parties;
+    private string _number = string.Empty;
+    private DateOnly _issueDate = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly _dueDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1));
+    private string _currency = "EUR";
+    private Guid _sellerId;
+    private Guid _buyerId;
+    private readonly List<CreateInvoiceLineRequest> _lines = [new("", 1, 0, 0.23m)];
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _parties = await Api.GetPartiesAsync();
+        if (_parties.Count >= 2)
+        {
+            _sellerId = _parties[0].Id;
+            _buyerId = _parties[1].Id;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+
+        if (_lines.Count == 0 || _lines.All(l => string.IsNullOrWhiteSpace(l.Description)))
+        {
+            _error = "At least one line with a description is required.";
+            return;
+        }
+
+        if (_sellerId == _buyerId)
+        {
+            _error = "Seller and buyer must be different parties.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await Api.CreateInvoiceAsync(new CreateInvoiceRequest(
+                _number, _issueDate.ToString("yyyy-MM-dd"), _dueDate.ToString("yyyy-MM-dd"),
+                _currency, _sellerId, _buyerId, _lines));
+            Nav.NavigateTo("/");
+        }
+        catch (HubApiException ex)
+        {
+            _error = ex.Detail;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

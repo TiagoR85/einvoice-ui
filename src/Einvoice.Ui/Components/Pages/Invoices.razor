@@ -1,0 +1,102 @@
+@page "/"
+@inject IEinvoiceApiClient Api
+@implements IDisposable
+
+<PageTitle>Invoices</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Invoices</h1>
+    <div>
+        <button class="btn btn-outline-secondary me-2" @onclick="LoadAsync">Refresh</button>
+        <label class="me-2"><input type="checkbox" @bind="_autoRefresh" /> Auto-refresh</label>
+        <a class="btn btn-primary" href="/invoices/new">New invoice</a>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-warning">@_error</div>
+}
+
+@if (_invoices is null)
+{
+    <p><em>Loading…</em></p>
+}
+else if (_invoices.Count == 0)
+{
+    <p>No invoices yet. Create the first one.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr><th>Number</th><th>Issue date</th><th>Total</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var row in _invoices)
+        {
+            <tr>
+                <td>@row.Number</td>
+                <td>@row.IssueDate</td>
+                <td>@row.TotalAmount.ToString("0.00") @row.Currency</td>
+                <td><StatusBadge Status="@row.Status" /></td>
+                <td>
+                    @if (row.Status == "Completed")
+                    {
+                        <a class="btn btn-sm btn-outline-primary" href="/pdf/@row.Id" target="_blank">PDF</a>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<InvoiceTableModel>? _invoices;
+    private bool _autoRefresh = true;
+    private string? _error;
+    private CancellationTokenSource? _refreshCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _refreshCts = new CancellationTokenSource();
+        _ = AutoRefreshLoopAsync(_refreshCts.Token);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var invoices = await Api.GetInvoicesAsync();
+            _invoices = invoices.Select(InvoiceTableModel.From).ToList();
+            _error = null;
+        }
+        catch (HubApiException ex)
+        {
+            _invoices = [];
+            _error = ex.Detail;
+        }
+    }
+
+    private async Task AutoRefreshLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try { await Task.Delay(TimeSpan.FromSeconds(3), ct); }
+            catch (OperationCanceledException) { return; }
+
+            if (!_autoRefresh || _invoices is null || _invoices.All(i => i.IsTerminal))
+                continue;
+
+            await InvokeAsync(async () =>
+            {
+                await LoadAsync();
+                StateHasChanged();
+            });
+        }
+    }
+
+    public void Dispose() => _refreshCts?.Cancel();
+}
