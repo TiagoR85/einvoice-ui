@@ -4,7 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Minio" Version="7.0.0" />
-    <PackageVersion Include="bunit" Version="2.11.3" />
+    <PackageVersion Include="bunit" Version="2.12.5" />
     <PackageVersion Include="WireMock.Net" Version="2.19.0" />
     <PackageVersion Include="Testcontainers.Minio" Version="4.15.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
